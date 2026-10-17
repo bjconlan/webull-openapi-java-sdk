@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag (e.g. v2.0.6)"
+        description: "Release tag (e.g. 2.0.6)"
         required: true
   push:
     branches:
@@ -39,14 +39,15 @@ jobs:
 
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             # manual trigger: use the provided tag, always release
+            # tolerate an optional leading 'v' in the input for convenience
             TAG_VERSION="${INPUT_TAG#v}"
             if [ "$TAG_VERSION" != "$CURRENT_VERSION" ]; then
               echo "::error::Input tag ($TAG_VERSION) does not match pom.xml version ($CURRENT_VERSION)"
               exit 1
             fi
-            echo "tag=v${CURRENT_VERSION}" >> "$GITHUB_OUTPUT"
+            echo "tag=${CURRENT_VERSION}" >> "$GITHUB_OUTPUT"
             echo "should_release=true" >> "$GITHUB_OUTPUT"
-            echo "Manual release requested for v${CURRENT_VERSION}"
+            echo "Manual release requested for ${CURRENT_VERSION}"
           else
             # push to main: only release when the pom version changed vs the previous commit
             PREV_VERSION=$(git show HEAD~1:webull-openapi-java-sdk/pom.xml 2>/dev/null \
@@ -54,7 +55,7 @@ jobs:
               | sed -E 's/<\/?version>//g' || echo "")
             echo "current=${CURRENT_VERSION} previous=${PREV_VERSION}"
             if [ "$CURRENT_VERSION" != "$PREV_VERSION" ]; then
-              echo "tag=v${CURRENT_VERSION}" >> "$GITHUB_OUTPUT"
+              echo "tag=${CURRENT_VERSION}" >> "$GITHUB_OUTPUT"
               echo "should_release=true" >> "$GITHUB_OUTPUT"
               echo "Version changed ($PREV_VERSION -> $CURRENT_VERSION), will release"
             else
@@ -86,7 +87,7 @@ jobs:
           VERSION: ${{ steps.decide.outputs.tag }}
         run: |
           set -euo pipefail
-          POM_VERSION="${VERSION#v}"  # jar file names use the bare version, tag has a 'v' prefix
+          POM_VERSION="${VERSION}"  # tag equals the bare pom version (no 'v' prefix)
           TARGET="webull-openapi-java-sdk/target"
           mkdir -p dist
           STAGE="dist/webull-openapi-java-sdk-${VERSION}"
@@ -126,7 +127,15 @@ jobs:
           VERSION: ${{ steps.decide.outputs.tag }}
         run: |
           set -euo pipefail
+          RELEASE_TITLE="webull openapi-java-sdk ${VERSION}"
+          # release notes use the latest commit message, with the [ISSUE-KEY] marker stripped
+          # e.g. "feat[API-1931]: auto-tag" -> "feat: auto-tag"
+          RELEASE_NOTES="$(git log -1 --pretty=%B | sed -E 's/^([a-z]+)\[[^]]*\]:/\1:/')"
           if gh release view "${VERSION}" --repo "${GITHUB_REPOSITORY}" > /dev/null 2>&1; then
+            gh release edit "${VERSION}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --title "${RELEASE_TITLE}" \
+              --notes "${RELEASE_NOTES}"
             gh release upload "${VERSION}" \
               dist/webull-openapi-java-sdk-*.zip \
               dist/webull-openapi-java-sdk-*.tar.gz \
@@ -139,6 +148,6 @@ jobs:
               dist/webull-openapi-java-sdk-*.tar.gz \
               dist/SHA256SUMS \
               --repo "${GITHUB_REPOSITORY}" \
-              --title "${VERSION}" \
-              --generate-notes
+              --title "${RELEASE_TITLE}" \
+              --notes "${RELEASE_NOTES}"
           fi
