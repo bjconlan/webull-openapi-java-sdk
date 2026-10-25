@@ -21,6 +21,7 @@ public class EventMarket {
     private String latestExpDate;
     private String payoutDate;
     private Boolean fractionable;
+    private String rulesPrimary;
     private List<PriceRange> priceRanges;
 
     public static class PriceRange {
@@ -198,6 +199,14 @@ public class EventMarket {
         this.fractionable = fractionable;
     }
 
+    public String getRulesPrimary() {
+        return rulesPrimary;
+    }
+
+    public void setRulesPrimary(String rulesPrimary) {
+        this.rulesPrimary = rulesPrimary;
+    }
+
     public List<PriceRange> getPriceRanges() {
         return priceRanges;
     }
@@ -224,6 +233,7 @@ public class EventMarket {
                 ", latestExpDate='" + latestExpDate + '\'' +
                 ", payoutDate='" + payoutDate + '\'' +
                 ", fractionable='" + fractionable + '\'' +
+                ", rulesPrimary='" + rulesPrimary + '\'' +
                 ", priceRanges='" + priceRanges + '\'' +
                 '}';
     }
